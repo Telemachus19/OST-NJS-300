@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth System Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .section {
+            border: 1px solid #ddd;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        input {
+            display: block;
+            margin-bottom: 10px;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        #userList {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+        }
+
+        .user-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- REGISTER SECTION -->
+    <div class="section">
+        <h2>1. Register</h2>
+        <input type="text" id="reg-username" placeholder="Username" />
+        <input type="email" id="reg-email" placeholder="Email" />
+        <input type="password" id="reg-password" placeholder="Password" />
+        <button onclick="register()">Register</button>
+        <p id="reg-msg"></p>
+    </div>
+
+    <!-- LOGIN SECTION -->
+    <div class="section">
+        <h2>2. Login</h2>
+        <input type="text" id="login-username" placeholder="Username" />
+        <input type="password" id="login-password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+        <p id="login-msg"></p>
+    </div>
+
+    <!-- PROTECTED CONTENT SECTION -->
+    <div class="section">
+        <h2>3. Protected Route: Get Users</h2>
+        <p>This button only works if you are logged in (Token required).</p>
+        <button onclick="getUsers()">Get User List</button>
+        <div id="userList"></div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:5000";
+
+        // 1. REGISTER FUNCTION
+        async function register() {
+            const body = {
+                username: document.getElementById("reg-username").value,
+                email: document.getElementById("reg-email").value,
+                password: document.getElementById("reg-password").value
+            };
+
+            const msgEl = document.getElementById("reg-msg");
+            msgEl.innerText = "Registering...";
+
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    msgEl.className = "success";
+                    msgEl.innerText = data.msg;
+                } else {
+                    msgEl.className = "error";
+                    msgEl.innerText = data.msg || "Error registering";
+                }
+            } catch (err) {
+                msgEl.innerText = "Network Error";
+            }
+        }
+
+        // 2. LOGIN FUNCTION
+        async function login() {
+            const body = {
+                username: document.getElementById("login-username").value,
+                password: document.getElementById("login-password").value
+            };
+
+            const msgEl = document.getElementById("login-msg");
+            msgEl.innerText = "Logging in...";
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const resJson = await res.json();
+
+                if (resJson.success) {
+                    // SAVE TOKEN TO LOCAL STORAGE
+                    localStorage.setItem("token", resJson.data.token);
+
+                    msgEl.className = "success";
+                    msgEl.innerText = `${resJson.msg}. Token saved!`;
+
+                    // Auto-fetch users after login
+                    getUsers();
+                } else {
+                    msgEl.className = "error";
+                    msgEl.innerText = resJson.msg;
+                }
+            } catch (err) {
+                msgEl.innerText = "Network Error";
+            }
+        }
+
+        // 3. GET USERS (Protected)
+        async function getUsers() {
+            const listEl = document.getElementById("userList");
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                listEl.innerHTML = "<span class='error'>You are not logged in (No token found).</span>";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/users`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "token": token // SENDING TOKEN IN HEADER
+                    }
+                });
+
+                const resJson = await res.json();
+
+                if (resJson.success) {
+                    const usersHtml = resJson.data.map(user =>
+                        `<div class="user-item">
+                            <strong>${user.username}</strong> (${user.email || 'No Email'}) 
+                            <small>ID: ${user._id}</small>
+                        </div>`
+                    ).join('');
+                    listEl.innerHTML = usersHtml;
+                } else {
+                    listEl.innerHTML = `<span class="error">${resJson.msg}</span>`;
+                }
+            } catch (err) {
+                listEl.innerText = "Error fetching users.";
+            }
+        }
+    </script>
+</body>
+
+</html>
